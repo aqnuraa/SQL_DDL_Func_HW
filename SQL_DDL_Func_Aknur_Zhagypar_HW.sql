@@ -1,4 +1,4 @@
-
+-- DDL Statements. Function: Tasks 1-5, applying view
 -- TASK 1: Creating a dynamic quarterly sales revenue view
 
 CREATE OR REPLACE VIEW public.sales_revenue_by_category_qtr AS

@@ -1,0 +1,87 @@
+﻿Task 6: Analysis of Existing Functions in the DVD Rental Database
+
+1. Operations Performed by the Existing Functions
+film_in_stock(film_id, store_id)
+This function identifies inventory copies of a particular film at a specified store that are available for rental. It calls inventory_in_stock() to check availability and returns inventory IDs. Although its output parameter is named p_film_count, it actually returns inventory identifiers rather than a count.
+film_not_in_stock(film_id, store_id)
+This function performs the opposite operation. It returns inventory IDs for copies of a film at a specified store that are not available for rental.
+inventory_in_stock(inventory_id)
+This function checks whether a particular inventory item is available. It examines the rental records and returns TRUE if no rental is currently open. Otherwise, it returns FALSE.
+get_customer_balance(customer_id, effective_date)
+This function calculates a customer's outstanding balance by adding rental charges and overdue fees, then subtracting payments made before the specified date.
+inventory_held_by_customer(inventory_id)
+This function identifies the customer currently holding an inventory item. It searches for a rental record without a return date and returns the corresponding customer ID.
+rewards_report(min_monthly_purchases, min_dollar_amount_purchased)
+This function identifies customers who meet minimum monthly purchase and spending requirements. It uses a temporary table and dynamic SQL to produce the report.
+last_day(timestamp)
+This function calculates the last calendar day of the month containing the provided timestamp.
+2. Why Does rewards_report Return Zero Rows?
+The original rewards_report function calculates its reporting period using a date three months before the current date.
+As a result, it examines a different reporting month from the previous calendar month that would normally be expected.
+The function also uses strict comparison operators (>) when checking minimum purchase and spending requirements. Therefore, customers who meet the minimum values exactly are excluded.
+Another possible reason for zero rows is that the sample DVD Rental database contains historical payments rather than recent transactions.
+Suggested correction:
+* Use the previous calendar month as the reporting period.
+* Replace > with >= for minimum thresholds.
+* Validate input parameters.
+* Replace unnecessary dynamic SQL and temporary tables with a static query.
+Even after these corrections, the function can legitimately return zero rows if the selected month contains no qualifying payments.
+3. Which Functions Are Redundant?
+The functions film_in_stock and film_not_in_stock perform complementary operations using the same inventory availability logic.
+The film_not_in_stock function could potentially be replaced with a query that directly filters unavailable inventory.
+Additionally, inventory_in_stock performs two counting operations. Its availability logic could be simplified using NOT EXISTS, which avoids counting every matching rental record.
+However, existing functions should not be deleted without checking whether other database objects or applications depend on them.
+4. Which Functions Violate SQL Best Practices?
+rewards_report
+This function uses dynamic SQL and a temporary table even though the query structure is known in advance. This makes the implementation more complicated and introduces possible temporary-table naming conflicts.
+It also uses SECURITY DEFINER, which requires careful privilege management.
+get_customer_balance
+The function does not fully implement the replacement-cost requirement described in its comments. It also uses limited-precision numeric variables and does not correctly account for all unreturned rentals.
+last_day
+The function is marked IMMUTABLE, although its result for a timestamp with time zone can depend on the session time zone.
+inventory_held_by_customer
+The function selects a customer without an explicit ordering rule. If inconsistent data contains multiple open rentals for the same inventory item, the selected customer may be unpredictable.
+film_in_stock and film_not_in_stock
+Their output parameter naming is misleading because the functions return inventory IDs rather than a numerical film count.
+5. How Should get_customer_balance Be Corrected?
+The original function is intended to calculate customer balances using four components:
+1. Rental fees for previous rentals.
+2. Overdue charges of $1 per overdue day.
+3. Replacement costs for rentals that exceed the specified overdue threshold.
+4. Payments made before the effective date.
+The existing implementation omits the replacement-cost calculation and does not properly account for rentals that remain unreturned.
+The corrected implementation should calculate overdue charges as of the requested effective date, include the replacement cost when the defined threshold is exceeded, and subtract payments made up to that date.
+It should also use an appropriate numeric type to prevent overflow when calculating large balances.
+The corrected SQL implementation is included in the accompanying analysis document.
+6. What Are group_concat and _group_concat?
+group_concat is a custom PostgreSQL aggregate function that combines multiple text values into a single comma-separated string.
+The _group_concat function is its transition function. It receives the accumulated text and the next value, then combines them.
+The exported database metadata confirms that:
+- Aggregate: group_concat(text)
+- Transition function: _group_concat
+- State data type: text
+For example, combining the values Action, Comedy, and Drama can produce:
+Action, Comedy, Drama
+The ordering of the combined values is not guaranteed unless explicitly specified.
+7. What Is last_updated and Where Is It Used?
+last_updated() is a trigger function designed to update the last_update column when a record is inserted or modified.
+Its implementation assigns CURRENT_TIMESTAMP to NEW.last_update and returns the modified row.
+It is intended to be attached to database tables using row-level triggers.
+The exported function definitions confirm its purpose, but do not identify the exact tables using it. Those tables must be verified through the database trigger metadata.
+8. What Is tmpSQL and Why Is EXECUTE Used?
+In the original rewards_report function, tmpSQL is a variable that stores a dynamically constructed SQL statement.
+The EXECUTE command runs that SQL statement.
+The function uses dynamic SQL to populate a temporary table with customers who meet its purchase and spending requirements.
+However, the table names, columns, and query structure are already known. Therefore, dynamic SQL is unnecessary.
+A simpler implementation can use a static SQL query with RETURN QUERY, making the function easier to understand, maintain, and test.
+9. Which Functions Can Produce Incorrect Results?
+get_customer_balance: May produce incorrect balances because it omits replacement charges, mishandles some unreturned rentals, and can calculate overdue fees beyond the effective date.
+rewards_report: May exclude qualifying customers because of strict comparison operators and may examine an unintended reporting month.
+last_day: Its IMMUTABLE declaration is inappropriate for a time-zone-sensitive calculation.
+inventory_held_by_customer: May return an unpredictable customer ID when multiple unreturned rental records exist for the same inventory item.
+group_concat: May produce values in an unpredictable order if no explicit ordering is provided.
+Conclusion
+The analysis of the existing DVD Rental database functions identified several opportunities to improve correctness, readability, maintainability, and reliability.
+The most important corrections concern rewards_report and get_customer_balance, because their implementations may produce incomplete or inaccurate results.
+Other improvements include simplifying inventory availability checks, avoiding unnecessary dynamic SQL, using appropriate function volatility declarations, and improving parameter naming.
+Overall, these changes can make the database functions easier to maintain and more reliable while preserving their intended functionality.
