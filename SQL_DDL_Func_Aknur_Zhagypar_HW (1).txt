@@ -57,9 +57,9 @@ The corrected SQL implementation is included in the accompanying analysis docume
 group_concat is a custom PostgreSQL aggregate function that combines multiple text values into a single comma-separated string.
 The _group_concat function is its transition function. It receives the accumulated text and the next value, then combines them.
 The exported database metadata confirms that:
-* Aggregate: group_concat(text)
-* Transition function: _group_concat
-* State data type: text
+- Aggregate: group_concat(text)
+- Transition function: _group_concat
+- State data type: text
 For example, combining the values Action, Comedy, and Drama can produce:
 Action, Comedy, Drama
 The ordering of the combined values is not guaranteed unless explicitly specified.
